@@ -53,14 +53,14 @@ import xmltramp
 #
 # Location to scan for new images
 #
-IMAGE_DIR = "images/"
+# args.image-dir = "images/"
 #
 #   Flickr settings
 #
 FLICKR = {"title": "",
         "description": "",
         "tags": "auto-upload",
-        "is_public": "1",
+        "is_public": "0",
         "is_friend": "0",
         "is_family": "0" }
 #
@@ -75,7 +75,11 @@ DRIP_TIME = 1 * 60
 #
 #   File we keep the history of uploaded images in.
 #
-HISTORY_FILE = os.path.join(IMAGE_DIR, "uploadr.history")
+
+#
+#   File Extensions to upload.
+#
+EXTENSIONS=["jpg", "gif", "png", "jpeg", "mov", "mp4", "avi", "tif", "mpg", ]
 
 ##
 ##  You shouldn't need to modify anything below here
@@ -87,7 +91,7 @@ class APIConstants:
     """ APIConstants class
     """
 
-    base = "http://flickr.com/services/"
+    base = "https://flickr.com/services/"
     rest   = base + "rest/"
     auth   = base + "auth/"
     upload = base + "upload/"
@@ -113,7 +117,9 @@ class Uploadr:
 
     token = None
     perms = ""
-    TOKEN_FILE = os.path.join(IMAGE_DIR, ".flickrToken")
+    TOKEN_FILE = os.path.expanduser(os.path.join("~/.flickr", ".flickrToken"))
+
+    print TOKEN_FILE
 
     def __init__( self ):
         """ Constructor
@@ -308,12 +314,15 @@ class Uploadr:
         newImages = self.grabNewImages()
         if ( not self.checkToken() ):
             self.authenticate()
+        HISTORY_FILE = os.path.join(args.image_dir, "uploadr.history")
         self.uploaded = shelve.open( HISTORY_FILE )
         for i, image in enumerate( newImages ):
+            print args.tags
             success = self.uploadImage( image )
             if args.drip_feed and success and i != len( newImages )-1:
                 print("Waiting " + str(DRIP_TIME) + " seconds before next upload")
                 time.sleep( DRIP_TIME )
+            self.uploaded.sync()
         self.uploaded.close()
 
     def grabNewImages( self ):
@@ -321,12 +330,12 @@ class Uploadr:
         """
 
         images = []
-        foo = os.walk( IMAGE_DIR )
+        foo = os.walk( args.image_dir )
         for data in foo:
             (dirpath, dirnames, filenames) = data
             for f in filenames :
                 ext = f.lower().split(".")[-1]
-                if ( ext == "jpg" or ext == "gif" or ext == "png" ):
+                if ext in EXTENSIONS:
                     images.append( os.path.normpath( dirpath + "/" + f ) )
         images.sort()
         return images
@@ -480,6 +489,8 @@ if __name__ == "__main__":
         help='Space-separated tags for uploaded images')
     parser.add_argument('-r', '--drip-feed',   action='store_true',
         help='Wait a bit between uploading individual images')
+    parser.add_argument('-p', '--image-dir',   action='store', default="~/Pictures",
+        help='Path to image directory')
     args = parser.parse_args()
 
     flick = Uploadr()
